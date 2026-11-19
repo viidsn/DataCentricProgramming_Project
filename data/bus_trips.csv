@@ -1,1 +1,2 @@
-date,direction,stop_name,scheduled_arrival,actual_arrival,time_of_day,delay_minutes
+date,direction,stop_name,scheduled_arrival,actual_arrival,time_of_day,delay_minutes,destination_arrival
+2026-11-19,Athboy to Dublin,Victorine Abbey,13:08,13:10,afternoon,2,14:01
