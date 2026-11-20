@@ -1,3 +1,5 @@
 date,direction,stop_name,scheduled_arrival,actual_arrival,time_of_day,destination_arrival,wait_time,weather
 2026-11-19,Athboy to Dublin,Victorine Abbey,13:08,13:10,afternoon,14:01,11,rain
 2026-11-19,Dublin to Athboy,Dalymount,17:44,17:54,evening,19:04,14,dry
+2026-11-20,Athboy to Dublin,Victorine Abbey,08:09,08:15,morning,09:13,11,dry
+2026-11-20,Dublin to Athboy,Dalymount,11:27,11:26,morning,12:17,6,dry
