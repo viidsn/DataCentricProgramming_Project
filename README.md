@@ -64,7 +64,19 @@ To be completed after analysing real observations. Results will describe the bus
 
 - **2026-11-19:** First observation: the bus was scheduled to arrive at Victorine Abbey towards Dublin at 13:08 and actually arrived at 13:10. I waited 11 minutes in rain and reached my destination at 14:01. This is an afternoon trip. Added `destination_arrival`, `wait_time`, and `weather`; arrival delays will be calculated during analysis rather than stored in the CSV.
 
-Photos and further collection notes will be added during collection.
+I photographed the posted timetables at both boarding stops. I use these signs to look up the scheduled times for route 111.
+
+![Posted timetable at Victorine Abbey](docs/images/victorine-abbey.jpg)
+
+*Victorine Abbey — route 111 towards Dublin (Busáras).*
+
+![Posted timetable at Dalymount](docs/images/dalymont.jpg)
+
+*Dalymount — route 111 towards Athboy.*
+
+![Phone notes with four bus trips recorded on 19 and 20 November 2026](docs/images/data%20collection.jpg)
+
+*My manual trip notes. Each line shows when I reached the stop, when the bus arrived, and when I reached my destination.*
 
 # List of files in the project
 
@@ -73,13 +85,15 @@ Photos and further collection notes will be added during collection.
 | `README.md` | Proposal and future project documentation | Provided template, adapted with AI assistance |
 | `PROJECT_BRIEF.md` | Assignment requirements | Provided assignment brief |
 | `data/bus_trips.csv` | CSV headers and manually recorded bus observations | Own observations |
+| `data/route_111_timetable.txt` | Timetable reference for both boarding stops | Transcribed from the posted timetables |
+| `docs/images/` | Photos of the posted timetables and a screenshot of my trip notes | Own photos and notes |
 
-Photos and application files will be listed when added.
+Application files will be listed when added.
 
 # References
 
 - [Assignment brief](PROJECT_BRIEF.md) and the README template.
-- The timetable source for route 111 will be added before collection begins.
+- Bus Éireann route 111 timetables posted at Victorine Abbey and Dalymount. See the [transcribed timetable](data/route_111_timetable.txt).
 
 # What I am most proud of in the assignment
 
