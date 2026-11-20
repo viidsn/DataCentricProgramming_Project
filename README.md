@@ -44,7 +44,16 @@ The application will use Python, MySQL, pandas, and matplotlib, with a simple co
 
 # Instructions for use
 
-The local database service will be started through XAMPP before running the application. Full setup and run instructions will be added when the application is built.
+Start **MySQL Database** in XAMPP. Set up the project's virtual environment from the project directory:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Run the connection check with `.venv/bin/python main.py`.
+
+The script connects to `127.0.0.1:3306` and displays the database server version. It defaults to the local `root` account with an empty password. If your setup uses different credentials, set `MYSQL_USER` and `MYSQL_PASSWORD` in your terminal environment before running the script.
 
 # How it works:
 
