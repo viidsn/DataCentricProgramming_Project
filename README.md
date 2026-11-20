@@ -51,9 +51,11 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Run the connection check with `.venv/bin/python main.py`.
+Import [schema.sql](schema.sql) in phpMyAdmin to create the `bus_tracker` database and its `bus_trips` table. Then run `.venv/bin/python main.py` to import the observations from `data/bus_trips.csv`.
 
-The script connects to `127.0.0.1:3306` and displays the database server version. It defaults to the local `root` account with an empty password. If your setup uses different credentials, set `MYSQL_USER` and `MYSQL_PASSWORD` in your terminal environment before running the script.
+The script validates the CSV, skips records whose nine values already match a stored trip, and reports the number added and the total stored. A corrected CSV row is inserted as a new record because its values differ from the original. The script stops on an invalid row before inserting any trips.
+
+The script connects to `127.0.0.1:3306` using the local `root` account with an empty password by default. If your setup uses different credentials, set `MYSQL_USER` and `MYSQL_PASSWORD` in your terminal environment before running the script.
 
 # How it works:
 
@@ -94,6 +96,7 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 | `README.md` | Proposal and future project documentation | Provided template, adapted with AI assistance |
 | `PROJECT_BRIEF.md` | Assignment requirements | Provided assignment brief |
 | `data/bus_trips.csv` | CSV headers and manually recorded bus observations | Own observations |
+| `schema.sql` | SQL script to create the database and trips table | Project database schema |
 | `data/route_111_timetable.txt` | Timetable reference for both boarding stops | Transcribed from the posted timetables |
 | `docs/images/` | Photos of the posted timetables and a screenshot of my trip notes | Own photos and notes |
 
