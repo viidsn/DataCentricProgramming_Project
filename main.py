@@ -19,6 +19,18 @@ BOARDING_STOPS = {
 }
 
 
+def connect_to_database() -> pymysql.connections.Connection:
+    """Open a connection to the local bus tracker database."""
+    return pymysql.connect(
+        host="127.0.0.1",
+        port=3306,
+        user=os.getenv("MYSQL_USER", "root"),
+        password=os.getenv("MYSQL_PASSWORD", ""),
+        database="bus_tracker",
+        connect_timeout=5,
+    )
+
+
 def read_trips(path: Path) -> list[tuple]:
     """Read and validate observations, converting blank fields to None."""
     trips = []
@@ -100,14 +112,7 @@ def main() -> int:
     """Read the CSV, import new trips, and report the stored total."""
     try:
         trips = read_trips(CSV_PATH)
-        with pymysql.connect(
-            host="127.0.0.1",
-            port=3306,
-            user=os.getenv("MYSQL_USER", "root"),
-            password=os.getenv("MYSQL_PASSWORD", ""),
-            database="bus_tracker",
-            connect_timeout=5,
-        ) as connection:
+        with connect_to_database() as connection:
             added = import_trips(connection, trips)
             with connection.cursor() as cursor:
                 cursor.execute("SELECT COUNT(*) FROM bus_trips")

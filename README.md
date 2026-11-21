@@ -57,6 +57,16 @@ The script validates the CSV, skips records whose nine values already match a st
 
 The script connects to `127.0.0.1:3306` using the local `root` account with an empty password by default. If your setup uses different credentials, set `MYSQL_USER` and `MYSQL_PASSWORD` in your terminal environment before running the script.
 
+## SQL queries
+
+After importing the trips, open the SQL tab in phpMyAdmin and run [data/queries.sql](data/queries.sql). It returns the average wait, the count and percentage of late buses, and the average wait and trip count for each recorded weather category.
+
+The late-arrival query compares times within the same calendar day. A trip whose scheduled and actual arrival fall on opposite sides of midnight needs a date-aware comparison.
+
+## Python analysis
+
+After installing the requirements and importing the CSV, run `.venv/bin/python analysis.py`. The report uses pandas to calculate the average wait, the share of buses that arrived late, and the average wait and trip count for each weather category. Each calculation uses the trips with the fields it needs. As with the SQL queries, the delay calculation assumes both arrival times fall on the same calendar day.
+
 # How it works:
 
 Planned workflow:
@@ -97,6 +107,8 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 | `PROJECT_BRIEF.md` | Assignment requirements | Provided assignment brief |
 | `data/bus_trips.csv` | CSV headers and manually recorded bus observations | Own observations |
 | `data/schema.sql` | SQL script to create the database and trips table | Project database schema |
+| `data/queries.sql` | SQL summaries for the three research questions | Project analysis queries |
+| `analysis.py` | Text summaries of wait times, punctuality and weather using pandas | Project analysis code |
 | `data/route_111_timetable.txt` | Timetable reference for both boarding stops | Transcribed from the posted timetables |
 | `docs/images/` | Photos of the posted timetables and a screenshot of my trip notes | Own photos and notes |
 
