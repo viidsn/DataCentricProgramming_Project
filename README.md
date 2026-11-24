@@ -67,7 +67,7 @@ The late-arrival query compares times within the same calendar day. A trip whose
 
 After installing the requirements and importing the CSV, run `.venv/bin/python analysis.py`. The report uses pandas to calculate the average wait, the share of buses that arrived late, and the average wait and trip count for each weather category. Each calculation uses the trips with the fields it needs. As with the SQL queries, the delay calculation assumes both arrival times fall on the same calendar day.
 
-Run `.venv/bin/python charts.py` to open the average wait chart. It shows the mean waiting time and the number of trips for each weather category with recorded waiting times.
+Run `.venv/bin/python charts.py` to open three charts showing average wait by weather, waiting time by trip, and the count and percentage of late versus on-time or early arrivals. The trip chart uses actual boarding time when available, then scheduled time, then the start of the recorded date. Import the CSV again with `.venv/bin/python main.py` after adding new observations so they appear in the charts.
 
 # How it works:
 
@@ -111,7 +111,7 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 | `data/schema.sql` | SQL script to create the database and trips table | Project database schema |
 | `data/queries.sql` | SQL summaries for the three research questions | Project analysis queries |
 | `analysis.py` | Text summaries of wait times, punctuality and weather using pandas | Project analysis code |
-| `charts.py` | Matplotlib chart of average waiting time by weather | Project chart code |
+| `charts.py` | Matplotlib charts of waiting times, weather and punctuality | Project chart code |
 | `data/route_111_timetable.txt` | Timetable reference for both boarding stops | Transcribed from the posted timetables |
 | `docs/images/` | Photos of the posted timetables and a screenshot of my trip notes | Own photos and notes |
 

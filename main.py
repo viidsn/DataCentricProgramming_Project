@@ -9,10 +9,10 @@ import pymysql
 
 
 CSV_PATH = Path(__file__).resolve().parent / "data" / "bus_trips.csv"
-COLUMNS = (
+COLUMNS = [
     "date", "direction", "stop_name", "scheduled_arrival", "actual_arrival",
     "time_of_day", "destination_arrival", "wait_time", "weather",
-)
+]
 BOARDING_STOPS = {
     "Athboy to Dublin": "Victorine Abbey",
     "Dublin to Athboy": "Dalymount",
@@ -36,7 +36,7 @@ def read_trips(path: Path) -> list[tuple]:
     trips = []
     with path.open(encoding="utf-8-sig", newline="") as source:
         reader = csv.reader(source, strict=True)
-        if next(reader, None) != list(COLUMNS):
+        if next(reader, None) != COLUMNS:
             raise ValueError("The CSV headers do not match the trip columns.")
 
         for row in reader:
@@ -53,22 +53,23 @@ def parse_trip(row: list[str]) -> tuple:
     """Check a CSV row against the measurement rules in the README."""
     if len(row) != len(COLUMNS):
         raise ValueError(f"expected {len(COLUMNS)} fields, found {len(row)}")
-    trip_date, direction, stop, scheduled, actual, period, destination, wait, weather = (
-        field.strip() for field in row
-    )
+    fields = [field.strip() for field in row]
+    trip_date, direction, stop, scheduled, actual, period, destination, wait, weather = fields
 
     if date.fromisoformat(trip_date).isoformat() != trip_date:
         raise ValueError("date must use YYYY-MM-DD")
-    if direction not in BOARDING_STOPS or BOARDING_STOPS[direction] != stop:
+    if BOARDING_STOPS.get(direction) != stop:
         raise ValueError("direction and boarding stop must match")
 
     for value in (scheduled, actual, destination):
-        if value and time.fromisoformat(value).isoformat(timespec="minutes") != value:
-            raise ValueError("arrival times must use HH:MM")
+        if value:
+            parsed_time = time.fromisoformat(value)
+            if parsed_time.strftime("%H:%M") != value:
+                raise ValueError("arrival times must use HH:MM")
 
     expected_period = ""
     if scheduled:
-        hour = time.fromisoformat(scheduled).hour
+        hour = int(scheduled[:2])
         if hour < 12:
             expected_period = "morning"
         elif hour < 17:
@@ -78,9 +79,11 @@ def parse_trip(row: list[str]) -> tuple:
     if period != expected_period:
         raise ValueError("time_of_day must match the scheduled arrival")
 
-    wait_minutes = int(wait) if wait else None
-    if wait_minutes is not None and not 0 <= wait_minutes <= 4_294_967_295:
-        raise ValueError("wait_time must fit in an unsigned INT")
+    wait_minutes = None
+    if wait:
+        wait_minutes = int(wait)
+        if not 0 <= wait_minutes <= 4_294_967_295:
+            raise ValueError("wait_time must fit in an unsigned INT")
     if weather not in ("", "rain", "dry"):
         raise ValueError("weather must be rain, dry, or blank")
 
@@ -90,21 +93,34 @@ def parse_trip(row: list[str]) -> tuple:
     )
 
 
-def import_trips(connection, trips: list[tuple]) -> int:
+def import_trips(connection: pymysql.connections.Connection, trips: list[tuple]) -> int:
     """Insert observations that are not already stored and return the count."""
-    columns = ", ".join(f"`{column}`" for column in COLUMNS)
-    placeholders = ", ".join(["%s"] * len(COLUMNS))
-    # MySQL's <=> operator considers two NULL values equal.
-    matches = " AND ".join(f"`{column}` <=> %s" for column in COLUMNS)
-    query = f"""
-        INSERT INTO bus_trips ({columns})
-        SELECT {placeholders}
-        WHERE NOT EXISTS (SELECT 1 FROM bus_trips WHERE {matches})
+    # Unlike =, MySQL's <=> treats two missing values as equal.
+    query = """
+        INSERT INTO bus_trips (
+            `date`, direction, stop_name, scheduled_arrival, actual_arrival,
+            time_of_day, destination_arrival, wait_time, weather
+        )
+        SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM bus_trips
+            WHERE `date` <=> %s
+              AND direction <=> %s
+              AND stop_name <=> %s
+              AND scheduled_arrival <=> %s
+              AND actual_arrival <=> %s
+              AND time_of_day <=> %s
+              AND destination_arrival <=> %s
+              AND wait_time <=> %s
+              AND weather <=> %s
+        )
     """
     inserted = 0
     with connection.cursor() as cursor:
         for trip in trips:
-            inserted += cursor.execute(query, trip + trip)
+            # First nine values for the insert, next nine for the duplicate check.
+            values = trip + trip
+            inserted += cursor.execute(query, values)
     return inserted
 
 
