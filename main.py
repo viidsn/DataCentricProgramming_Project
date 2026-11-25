@@ -1,11 +1,12 @@
-"""Import recorded bus trips into the bus tracker database in XAMPP."""
+"""Import recorded bus trips into the XAMPP database."""
 
 import csv
-import os
-from datetime import date, time
+from datetime import date, time, timedelta
 from pathlib import Path
 
 import pymysql
+
+from database import connect_to_database
 
 
 CSV_PATH = Path(__file__).resolve().parent / "data" / "bus_trips.csv"
@@ -17,18 +18,6 @@ BOARDING_STOPS = {
     "Athboy to Dublin": "Victorine Abbey",
     "Dublin to Athboy": "Dalymount",
 }
-
-
-def connect_to_database() -> pymysql.connections.Connection:
-    """Open a connection to the local bus tracker database."""
-    return pymysql.connect(
-        host="127.0.0.1",
-        port=3306,
-        user=os.getenv("MYSQL_USER", "root"),
-        password=os.getenv("MYSQL_PASSWORD", ""),
-        database="bus_tracker",
-        connect_timeout=5,
-    )
 
 
 def read_trips(path: Path) -> list[tuple]:
@@ -56,16 +45,15 @@ def parse_trip(row: list[str]) -> tuple:
     fields = [field.strip() for field in row]
     trip_date, direction, stop, scheduled, actual, period, destination, wait, weather = fields
 
-    if date.fromisoformat(trip_date).isoformat() != trip_date:
+    parsed_date = date.fromisoformat(trip_date)
+    if parsed_date.isoformat() != trip_date:
         raise ValueError("date must use YYYY-MM-DD")
     if BOARDING_STOPS.get(direction) != stop:
         raise ValueError("direction and boarding stop must match")
 
-    for value in (scheduled, actual, destination):
-        if value:
-            parsed_time = time.fromisoformat(value)
-            if parsed_time.strftime("%H:%M") != value:
-                raise ValueError("arrival times must use HH:MM")
+    scheduled_time = parse_arrival(scheduled)
+    actual_time = parse_arrival(actual)
+    destination_time = parse_arrival(destination)
 
     expected_period = ""
     if scheduled:
@@ -88,43 +76,51 @@ def parse_trip(row: list[str]) -> tuple:
         raise ValueError("weather must be rain, dry, or blank")
 
     return (
-        trip_date, direction, stop, scheduled or None, actual or None,
-        period or None, destination or None, wait_minutes, weather or None,
+        parsed_date, direction, stop, scheduled_time, actual_time,
+        period or None, destination_time, wait_minutes, weather or None,
     )
+
+
+def parse_arrival(value: str) -> timedelta | None:
+    """Convert a CSV time to the same format PyMySQL uses for SQL TIME."""
+    if not value:
+        return None
+
+    arrival = time.fromisoformat(value)
+    if arrival.strftime("%H:%M") != value:
+        raise ValueError("arrival times must use HH:MM")
+    return timedelta(hours=arrival.hour, minutes=arrival.minute)
 
 
 def import_trips(connection: pymysql.connections.Connection, trips: list[tuple]) -> int:
     """Insert observations that are not already stored and return the count."""
-    # Unlike =, MySQL's <=> treats two missing values as equal.
-    query = """
+    select_trips = """
+        SELECT `date`, direction, stop_name, scheduled_arrival, actual_arrival,
+               time_of_day, destination_arrival, wait_time, weather
+        FROM bus_trips
+        FOR UPDATE
+    """
+    insert_trip = """
         INSERT INTO bus_trips (
             `date`, direction, stop_name, scheduled_arrival, actual_arrival,
             time_of_day, destination_arrival, wait_time, weather
         )
-        SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s
-        WHERE NOT EXISTS (
-            SELECT 1 FROM bus_trips
-            WHERE `date` <=> %s
-              AND direction <=> %s
-              AND stop_name <=> %s
-              AND scheduled_arrival <=> %s
-              AND actual_arrival <=> %s
-              AND time_of_day <=> %s
-              AND destination_arrival <=> %s
-              AND wait_time <=> %s
-              AND weather <=> %s
-        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     inserted = 0
     with connection.cursor() as cursor:
+        # Hold the database rows until commit while checking for duplicates.
+        cursor.execute(select_trips)
+        stored_trips = set(cursor.fetchall())
         for trip in trips:
-            # First nine values for the insert, next nine for the duplicate check.
-            values = trip + trip
-            inserted += cursor.execute(query, values)
+            if trip not in stored_trips:
+                cursor.execute(insert_trip, trip)
+                stored_trips.add(trip)
+                inserted += 1
     return inserted
 
 
-def main() -> int:
+def main() -> None:
     """Read the CSV, import new trips, and report the stored total."""
     try:
         trips = read_trips(CSV_PATH)
@@ -136,12 +132,10 @@ def main() -> int:
             connection.commit()
     except (OSError, ValueError, csv.Error, pymysql.MySQLError) as error:
         print(f"Trip import failed: {error}")
-        return 1
+        return
 
     print(f"Added {added} trip(s) from {CSV_PATH.name}.")
     print(f"Trips stored in bus_tracker.bus_trips: {trip_count}")
-    return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+main()

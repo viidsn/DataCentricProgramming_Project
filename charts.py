@@ -3,17 +3,14 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import pymysql
-from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
 from matplotlib.figure import Figure
-from matplotlib.ticker import MaxNLocator
 
-from analysis import (
+from database import (
+    connect_to_database,
     load_trips,
     punctuality_counts,
     wait_by_weather,
-    waiting_times_over_time,
 )
-from main import connect_to_database
 
 
 def plot_wait_by_weather(summary: pd.DataFrame) -> Figure:
@@ -36,13 +33,25 @@ def plot_wait_by_weather(summary: pd.DataFrame) -> Figure:
     return figure
 
 
+def waiting_times_over_time(trips: pd.DataFrame) -> pd.Series:
+    """Return recorded waits indexed by trip date and boarding time."""
+    recorded = trips.dropna(subset=["wait_time"])
+    actual = pd.to_timedelta(recorded["actual_arrival"])
+    scheduled = pd.to_timedelta(recorded["scheduled_arrival"])
+    boarding_time = actual.fillna(scheduled)
+    boarding_time = boarding_time.fillna(pd.Timedelta(0))
+    trip_dates = pd.to_datetime(recorded["date"])
+    timestamps = trip_dates + boarding_time
+    waits = recorded["wait_time"].copy()
+    waits.index = timestamps
+    return waits.sort_index(kind="stable")
+
+
 def plot_waiting_times(waits: pd.Series) -> Figure:
     """Plot one point per trip with a recorded waiting time."""
     figure, ax = plt.subplots(figsize=(8, 4), layout="constrained")
     ax.plot(waits.index, waits, marker="o", color="#387EAD")
-    locator = AutoDateLocator(minticks=3, maxticks=8)
-    ax.xaxis.set_major_locator(locator)
-    ax.xaxis.set_major_formatter(ConciseDateFormatter(locator))
+    ax.tick_params(axis="x", labelrotation=30)
     if waits.index.min() == waits.index.max():
         timestamp = waits.index[0]
         hour = pd.Timedelta(hours=1)
@@ -67,19 +76,18 @@ def plot_punctuality(late: int, on_time_or_early: int) -> Figure:
     ax.bar_label(bars, labels=labels, padding=4)
     ax.set_title(f"Route 111 punctuality ({total} trips)")
     ax.set_ylabel("Number of trips")
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_ylim(0, max(counts) * 1.2)
     return figure
 
 
-def main() -> int:
+def main() -> None:
     """Load trip data and show each chart with enough data to render."""
     try:
         with connect_to_database() as connection:
             trips = load_trips(connection)
     except pymysql.MySQLError as error:
         print(f"Could not load trips: {error}")
-        return 1
+        return
 
     summary = wait_by_weather(trips)
     if summary.empty:
@@ -103,8 +111,6 @@ def main() -> int:
     has_chart = not summary.empty or not waits.empty or total > 0
     if has_chart:
         plt.show()
-    return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+main()

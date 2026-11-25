@@ -3,20 +3,7 @@
 import pandas as pd
 import pymysql
 
-from main import connect_to_database
-
-
-def load_trips(connection: pymysql.connections.Connection) -> pd.DataFrame:
-    """Read the fields needed for analysis from the bus trips table."""
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT `date`, wait_time, weather, scheduled_arrival, actual_arrival
-            FROM bus_trips
-            ORDER BY id
-        """)
-        rows = cursor.fetchall()
-        columns = [column[0] for column in cursor.description]
-    return pd.DataFrame(rows, columns=columns)
+from database import connect_to_database, load_trips, punctuality_counts, wait_by_weather
 
 
 def average_wait(trips: pd.DataFrame) -> float | None:
@@ -27,54 +14,14 @@ def average_wait(trips: pd.DataFrame) -> float | None:
     return float(waits.mean())
 
 
-def arrival_delays(trips: pd.DataFrame) -> pd.Series:
-    """Calculate delays in minutes for trips with both arrival times."""
-    arrivals = trips.dropna(subset=["scheduled_arrival", "actual_arrival"])
-    # PyMySQL returns SQL TIME values as timedeltas from midnight.
-    scheduled = pd.to_timedelta(arrivals["scheduled_arrival"])
-    actual = pd.to_timedelta(arrivals["actual_arrival"])
-    difference = actual - scheduled
-    return difference.dt.total_seconds() / 60
-
-
-def wait_by_weather(trips: pd.DataFrame) -> pd.DataFrame:
-    """Return the average wait and sample size for each recorded weather group."""
-    known_weather = trips["weather"].isin(["rain", "dry"])
-    recorded = trips[known_weather].dropna(subset=["wait_time"])
-    groups = recorded.groupby("weather")["wait_time"]
-    return groups.agg(trips="count", average_wait_minutes="mean")
-
-
-def waiting_times_over_time(trips: pd.DataFrame) -> pd.Series:
-    """Return recorded waits indexed by trip date and boarding time."""
-    recorded = trips.dropna(subset=["wait_time"])
-    actual = pd.to_timedelta(recorded["actual_arrival"])
-    scheduled = pd.to_timedelta(recorded["scheduled_arrival"])
-    boarding_time = actual.fillna(scheduled)
-    boarding_time = boarding_time.fillna(pd.Timedelta(0))
-    trip_dates = pd.to_datetime(recorded["date"])
-    timestamps = trip_dates + boarding_time
-    waits = recorded["wait_time"].copy()
-    waits.index = timestamps
-    return waits.sort_index(kind="stable")
-
-
-def punctuality_counts(trips: pd.DataFrame) -> tuple[int, int]:
-    """Count late and on-time or early trips with known arrival times."""
-    delays = arrival_delays(trips)
-    late = int((delays > 0).sum())
-    on_time_or_early = len(delays) - late
-    return late, on_time_or_early
-
-
-def main() -> int:
+def main() -> None:
     """Load the stored trips and print answers to the three research questions."""
     try:
         with connect_to_database() as connection:
             trips = load_trips(connection)
     except pymysql.MySQLError as error:
         print(f"Could not load trips: {error}")
-        return 1
+        return
 
     mean = average_wait(trips)
     if mean is None:
@@ -100,8 +47,6 @@ def main() -> int:
             average = row["average_wait_minutes"]
             count = int(row["trips"])
             print(f"  {weather}: {average:.2f} minutes ({count} trips)")
-    return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+main()
