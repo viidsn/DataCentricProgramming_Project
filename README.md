@@ -2,13 +2,14 @@
 
 Data Centric Programming Assignment 2026 — [Assignment Brief](PROJECT_BRIEF.md)
 
-**Status:** Proposal. Data collection has started; application development is planned.
+**Status:** Data collection is ongoing. CSV import, SQL queries, the pandas report, and four charts are ready. The interactive menu is planned.
 
 # Questions
 
 1. How many minutes do I wait for the bus on average?
 2. How often does the bus arrive later than scheduled?
 3. Does the average waiting time differ between rainy and dry weather?
+4. How much does my average time on the bus vary between morning, afternoon, and evening trips?
 
 # Data Dictionary
 
@@ -24,13 +25,13 @@ Each row describes one trip I take on route 111 (Athboy–Dublin). I record obse
 | `time_of_day` | Category | `morning`, `afternoon`, `evening` | Classify the scheduled time: before 12:00 = morning; 12:00–16:59 = afternoon; 17:00–23:59 = evening. |
 | `destination_arrival` | Time | Local time, `HH:MM`, 24-hour clock | Read my phone clock when the bus reaches the destination stop where I get off and record the time to the minute. |
 | `wait_time` | Integer | Minutes, zero or greater | Measure the elapsed time from when I reach the boarding stop until the bus stops for boarding, using my phone clock or stopwatch, and record it to the nearest minute. |
-| `weather` | Category | `rain`, `dry` | Observe the weather while waiting: record `rain` if it rains at any point during the wait; otherwise record `dry`. |
+| `weather` | Category | `rain`, `dry` | Record `rain` if it rains at any point during the wait. Otherwise record `dry`. |
 
-`delay_minutes` will be calculated during analysis as actual arrival minus scheduled arrival; it is not stored in the CSV. Positive delay means late, zero means on time at one-minute precision, and negative delay means early. Waiting time is measured separately: it starts when I reach the stop, regardless of the timetable. Any arrival crossing midnight will be noted in the collection diary so that the delay uses the correct dates.
+`delay_minutes` is calculated during analysis by subtracting the scheduled arrival time from the actual arrival time. The CSV stores the two arrival times. A positive delay means late, zero means on time to the nearest minute, and a negative delay means early. Waiting time starts when I reach the stop, regardless of the timetable. The delay calculation assumes both arrival times fall on the same calendar day. I will note any exceptions in the collection diary.
 
-Leave missing values blank. Zero is a valid measurement. If the scheduled arrival is unknown, leave `time_of_day` blank. A delay can only be calculated when both arrival times are available. Waiting-time summaries include only recorded waits, and weather comparisons require both `wait_time` and `weather`.
+All nine fields are required for every trip. If any field is blank, the import stops before saving trips. A waiting time of zero minutes is valid.
 
-The time-of-day boundaries above are the proposed rules and will be fixed before the first observation.
+The same time-of-day boundaries apply to every observation.
 
 # Description of the project
 
@@ -53,9 +54,9 @@ python3 -m venv .venv
 
 Import [data/schema.sql](data/schema.sql) in phpMyAdmin to create the `bus_tracker` database and its `bus_trips` table. Then run `.venv/bin/python main.py` to import the observations from `data/bus_trips.csv`.
 
-The script checks the entire CSV before inserting any trips. If a row is invalid, the import stops. It skips any row whose nine values match a stored trip, then reports how many trips it added and how many are in the database. If you correct a row already in the database, the script inserts the corrected row as a new trip.
+The script checks the entire CSV before inserting any trips. If a row is invalid, the import stops. It skips any row whose nine values match a stored trip, then reports how many trips it added. If you correct a row already in the database, the script inserts the corrected row as a new trip.
 
-The script connects to `127.0.0.1:3306` using the local `root` account with an empty password by default. If your setup uses different credentials, set `MYSQL_USER` and `MYSQL_PASSWORD` in your terminal environment before running the script.
+The script connects to `127.0.0.1:3306` using the local XAMPP `root` account with an empty password. The connection settings are in `database.py`.
 
 ## SQL queries
 
@@ -65,19 +66,21 @@ The late-arrival query compares times within the same calendar day. A trip whose
 
 ## Python analysis
 
-After installing the requirements and importing the CSV, run `.venv/bin/python analysis.py`. The report uses pandas to calculate the average wait, the share of buses that arrived late, and the average wait and trip count for each weather category. Each calculation uses the trips with the fields it needs. As with the SQL queries, the delay calculation assumes both arrival times fall on the same calendar day.
+After importing the CSV, run `.venv/bin/python analysis.py`. The report uses pandas to calculate the average wait, the share of buses that arrived late, and the average wait and trip count for each weather category. As with the SQL queries, the delay calculation assumes both arrival times fall on the same calendar day.
 
-Run `.venv/bin/python charts.py` to open three charts showing average wait by weather, waiting time by trip, and the count and percentage of arrivals in each punctuality group (late, or on time or early). The trip chart places each observation at the actual boarding time when available. If that time is missing, it uses the scheduled time. If both times are missing, it uses the start of the recorded date. After adding observations, import the CSV again with `.venv/bin/python main.py` so the new trips appear in the charts.
+The report also compares average time on the bus for morning, afternoon, and evening trips. Ride duration is `destination_arrival` minus `actual_arrival` in minutes. A destination time earlier than boarding is treated as the next day. The comparison uses the scheduled `time_of_day` of each trip.
+
+Run `.venv/bin/python charts.py` to open four charts showing average wait by weather, waiting time by trip, arrival punctuality, and average ride duration by time of day. The waiting-time scatter plot shows one point per trip and groups trips from the same date in a column. A dashed line shows the average across all trips. After adding observations, import the CSV again with `.venv/bin/python main.py` so the new trips appear in the charts.
 
 # How it works:
 
-Planned workflow:
+Current workflow:
 
 1. Record trips manually in the CSV.
 2. Load them into a MySQL database running locally through XAMPP, validating dates, times, categories, missing fields, and non-negative waiting times. Check that each boarding stop matches the recorded direction. Flag inconsistent or unusual values for review without silently removing real observations.
 3. Use SQL filtering, grouping, ordering, averages, and counts to summarise trips.
-4. Analyse the records with pandas: calculate arrival delays from the recorded times, the average waiting time, and the count and percentage of buses arriving later than scheduled. Compare average waiting times for `rain` and `dry`, also considering direction where enough observations exist.
-5. Show labelled matplotlib charts of waiting times over time, average waiting time by weather, and late versus on-time or early arrivals. Include sample counts for each summary.
+4. Use pandas to calculate arrival delays, average waiting time, and the count and percentage of late buses. Compare average waiting times in `rain` and `dry` weather and average ride durations across the three times of day.
+5. Show labelled matplotlib charts for waiting times over time, average wait by weather, punctuality, and average ride duration by time of day. Include sample counts for each summary.
 
 # Findings
 
@@ -109,15 +112,13 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 | `PROJECT_BRIEF.md` | Assignment requirements | Provided assignment brief |
 | `data/bus_trips.csv` | CSV headers and manually recorded bus observations | Own observations |
 | `data/schema.sql` | SQL script to create the database and trips table | Project database schema |
-| `data/queries.sql` | SQL summaries for the three research questions | Project analysis queries |
+| `data/queries.sql` | SQL summaries for the first three research questions | Project analysis queries |
 | `main.py` | Imports trip observations from CSV | Project application code |
 | `database.py` | Connects to XAMPP, loads trips and calculates shared summaries for the report and charts | Project database and analysis code |
-| `analysis.py` | Text summaries of wait times, punctuality and weather using pandas | Project analysis code |
-| `charts.py` | Matplotlib charts of waiting times, weather and punctuality | Project chart code |
+| `analysis.py` | Text summaries of waiting times, punctuality, waiting times by weather, and ride duration by time of day | Project analysis code |
+| `charts.py` | Matplotlib charts of waiting times, waiting times by weather, punctuality, and ride duration by time of day | Project chart code |
 | `data/route_111_timetable.txt` | Timetable reference for both boarding stops | Transcribed from the posted timetables |
 | `docs/images/` | Photos of the posted timetables and a screenshot of my trip notes | Own photos and notes |
-
-Application files will be listed when added.
 
 # References
 

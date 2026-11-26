@@ -8,10 +8,10 @@ CREATE TABLE IF NOT EXISTS bus_trips (
     `date` DATE NOT NULL,
     direction ENUM('Athboy to Dublin', 'Dublin to Athboy') NOT NULL,
     stop_name ENUM('Victorine Abbey', 'Dalymount') NOT NULL,
-    scheduled_arrival TIME,
-    actual_arrival TIME,
-    time_of_day ENUM('morning', 'afternoon', 'evening'),
-    destination_arrival TIME,
-    wait_time INT UNSIGNED,
-    weather ENUM('rain', 'dry')
+    scheduled_arrival TIME NOT NULL,
+    actual_arrival TIME NOT NULL,
+    time_of_day ENUM('morning', 'afternoon', 'evening') NOT NULL,
+    destination_arrival TIME NOT NULL,
+    wait_time INT UNSIGNED NOT NULL,
+    weather ENUM('rain', 'dry') NOT NULL
 );

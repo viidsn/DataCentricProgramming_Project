@@ -9,7 +9,9 @@ from database import (
     connect_to_database,
     load_trips,
     punctuality_counts,
+    ride_time_by_period,
     wait_by_weather,
+    waiting_times_over_time,
 )
 
 
@@ -33,33 +35,22 @@ def plot_wait_by_weather(summary: pd.DataFrame) -> Figure:
     return figure
 
 
-def waiting_times_over_time(trips: pd.DataFrame) -> pd.Series:
-    """Return recorded waits indexed by trip date and boarding time."""
-    recorded = trips.dropna(subset=["wait_time"])
-    actual = pd.to_timedelta(recorded["actual_arrival"])
-    scheduled = pd.to_timedelta(recorded["scheduled_arrival"])
-    boarding_time = actual.fillna(scheduled)
-    boarding_time = boarding_time.fillna(pd.Timedelta(0))
-    trip_dates = pd.to_datetime(recorded["date"])
-    timestamps = trip_dates + boarding_time
-    waits = recorded["wait_time"].copy()
-    waits.index = timestamps
-    return waits.sort_index(kind="stable")
-
-
 def plot_waiting_times(waits: pd.Series) -> Figure:
-    """Plot one point per trip with a recorded waiting time."""
+    """Plot each trip as a point and stack trips from the same date."""
     figure, ax = plt.subplots(figsize=(8, 4), layout="constrained")
-    ax.plot(waits.index, waits, marker="o", color="#387EAD")
+    dates = waits.index.strftime("%d/%m/%y")
+    ax.scatter(dates, waits, s=55, color="#387EAD")
+    average_wait = waits.mean()
+    ax.axhline(average_wait, color="#A34C36", linestyle="--",
+               label=f"Average wait: {average_wait:.2f} min")
+    ax.legend()
     ax.tick_params(axis="x", labelrotation=30)
-    if waits.index.min() == waits.index.max():
-        timestamp = waits.index[0]
-        hour = pd.Timedelta(hours=1)
-        ax.set_xlim(timestamp - hour, timestamp + hour)
-    ax.set_title(f"Route 111 waiting time by trip ({len(waits)} recorded)")
-    ax.set_xlabel("Trip date and time")
+    ax.set_title(f"Route 111 waiting time by date ({len(waits)} trips)")
+    ax.set_xlabel("Trip date")
     ax.set_ylabel("Wait (minutes)")
     ax.set_ylim(bottom=0)
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", alpha=0.25)
     return figure
 
 
@@ -72,16 +63,33 @@ def plot_punctuality(late: int, on_time_or_early: int) -> Figure:
         ["Late", "On time or early"], counts,
         color=["#B95037", "#387EAD"], width=0.6,
     )
-    labels = [f"{count} ({count / total:.1%})" for count in counts]
+    labels = [f"{count} ({count / max(total, 1):.1%})" for count in counts]
     ax.bar_label(bars, labels=labels, padding=4)
     ax.set_title(f"Route 111 punctuality ({total} trips)")
     ax.set_ylabel("Number of trips")
-    ax.set_ylim(0, max(counts) * 1.2)
+    ax.set_ylim(0, max(1, max(counts) * 1.2))
+    return figure
+
+
+def plot_ride_time_by_period(summary: pd.DataFrame) -> Figure:
+    """Plot average time onboard for morning, afternoon and evening trips."""
+    labels = []
+    for period, count in summary["trips"].items():
+        trip_word = "trip" if count == 1 else "trips"
+        labels.append(f"{period.capitalize()}\n({count} {trip_word})")
+
+    figure, ax = plt.subplots(figsize=(7, 4), layout="constrained")
+    averages = summary["average_ride_minutes"]
+    bars = ax.bar(labels, averages, color="#387EAD", width=0.6)
+    ax.bar_label(bars, fmt="%.2f", padding=4)
+    ax.set_title("Route 111 average time on the bus by time of day")
+    ax.set_ylabel("Average ride duration (minutes)")
+    ax.set_ylim(0, max(1, averages.max() * 1.2))
     return figure
 
 
 def main() -> None:
-    """Load trip data and show each chart with enough data to render."""
+    """Load trip data and show all four charts."""
     try:
         with connect_to_database() as connection:
             trips = load_trips(connection)
@@ -90,27 +98,18 @@ def main() -> None:
         return
 
     summary = wait_by_weather(trips)
-    if summary.empty:
-        print("No trips with both a wait time and weather to plot.")
-    else:
-        plot_wait_by_weather(summary)
+    plot_wait_by_weather(summary)
 
     waits = waiting_times_over_time(trips)
-    if waits.empty:
-        print("No recorded waiting times to plot over time.")
-    else:
-        plot_waiting_times(waits)
+    plot_waiting_times(waits)
 
     late, on_time_or_early = punctuality_counts(trips)
-    total = late + on_time_or_early
-    if total == 0:
-        print("No trips with both arrival times to plot punctuality.")
-    else:
-        plot_punctuality(late, on_time_or_early)
+    plot_punctuality(late, on_time_or_early)
 
-    has_chart = not summary.empty or not waits.empty or total > 0
-    if has_chart:
-        plt.show()
+    rides = ride_time_by_period(trips)
+    plot_ride_time_by_period(rides)
+
+    plt.show()
 
 
 main()
