@@ -20,14 +20,17 @@ def main() -> None:
         print(f"Could not load trips: {error}")
         return
 
+    # Question 1. Average all recorded waiting times.
     mean = trips["wait_time"].mean()
     print(f"Average wait: {mean:.2f} minutes ({len(trips)} trips).")
 
+    # Question 2. Divide the late count by the total to get a percentage.
     late, on_time_or_early = punctuality_counts(trips)
     total = late + on_time_or_early
     percentage = 100 * late / total
     print(f"Late arrivals: {late}/{total} ({percentage:.2f}%).")
 
+    # Question 3. Show the mean and the number of trips for each weather group.
     weather_summary = wait_by_weather(trips)
     print("Average wait by weather:")
     for weather, row in weather_summary.iterrows():
@@ -35,6 +38,7 @@ def main() -> None:
         count = int(row["trips"])
         print(f"  {weather}: {average:.2f} minutes ({count} trips)")
 
+    # Question 4. Compare ride durations for periods with recorded trips.
     rides = ride_time_by_period(trips)
     recorded_periods = rides[rides["trips"] > 0]
     print("Average time on the bus by time of day:")

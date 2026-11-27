@@ -11,8 +11,15 @@ from database import connect_to_database
 
 CSV_PATH = Path(__file__).resolve().parent / "data" / "bus_trips.csv"
 COLUMNS = [
-    "date", "direction", "stop_name", "scheduled_arrival", "actual_arrival",
-    "time_of_day", "destination_arrival", "wait_time", "weather",
+    "date",
+    "direction",
+    "stop_name",
+    "scheduled_arrival",
+    "actual_arrival",
+    "time_of_day",
+    "destination_arrival",
+    "wait_time",
+    "weather",
 ]
 BOARDING_STOPS = {
     "Athboy to Dublin": "Victorine Abbey",
@@ -20,38 +27,45 @@ BOARDING_STOPS = {
 }
 
 
-def read_trips(path: Path) -> list[tuple]:
+def read_trips(path: Path) -> list[tuple] | None:
     """Read and validate complete trip observations from the CSV."""
     trips = []
-    with path.open(encoding="utf-8-sig", newline="") as source:
-        reader = csv.reader(source, strict=True)
-        if next(reader, None) != COLUMNS:
-            raise ValueError("The CSV headers do not match the trip columns.")
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            reader = csv.DictReader(source)
+            # fieldnames comes from the header. The loop below checks the trip rows.
+            if reader.fieldnames != COLUMNS:
+                raise ValueError("The CSV headers do not match the trip columns.")
 
-        for row in reader:
-            trips.append(parse_trip(row))
+            for row in reader:
+                trips.append(parse_trip(row))
+    except (OSError, csv.Error) as error:
+        print(f"Could not read CSV: {error}")
+        return None
     return trips
 
 
-def parse_trip(row: list[str]) -> tuple:
+def parse_trip(row: dict[str, str | None]) -> tuple:
     """Check a CSV row against the measurement rules in the README."""
+    # DictReader puts extra values under an extra key and fills missing values with None.
     if len(row) != len(COLUMNS):
-        raise ValueError(f"expected {len(COLUMNS)} fields, found {len(row)}")
-    fields = []
-    for field in row:
-        value = field.strip()
+        raise ValueError("The trip has extra fields")
+    fields = {}
+    for column in COLUMNS:
+        value = (row[column] or "").strip()
         if value == "":
             raise ValueError("All trip fields are required")
-        fields.append(value)
-    trip_date = fields[0]
-    direction = fields[1]
-    stop = fields[2]
-    scheduled = fields[3]
-    actual = fields[4]
-    period = fields[5]
-    destination = fields[6]
-    wait = fields[7]
-    weather = fields[8]
+        fields[column] = value
+
+    trip_date = fields["date"]
+    direction = fields["direction"]
+    stop = fields["stop_name"]
+    scheduled = fields["scheduled_arrival"]
+    actual = fields["actual_arrival"]
+    period = fields["time_of_day"]
+    destination = fields["destination_arrival"]
+    wait = fields["wait_time"]
+    weather = fields["weather"]
 
     parsed_date = date.fromisoformat(trip_date)
     if parsed_date.isoformat() != trip_date:
@@ -63,6 +77,7 @@ def parse_trip(row: list[str]) -> tuple:
     actual_time = parse_arrival(actual)
     destination_time = parse_arrival(destination)
 
+    # Use the scheduled hour so a delay cannot move a trip to a different period.
     hour = int(scheduled[:2])
     if hour < 12:
         expected_period = "morning"
@@ -79,9 +94,17 @@ def parse_trip(row: list[str]) -> tuple:
     if weather not in ("rain", "dry"):
         raise ValueError("weather must be rain or dry")
 
+    # Keep this tuple in the same order as the columns in the INSERT below.
     return (
-        parsed_date, direction, stop, scheduled_time, actual_time,
-        period, destination_time, wait_minutes, weather,
+        parsed_date,
+        direction,
+        stop,
+        scheduled_time,
+        actual_time,
+        period,
+        destination_time,
+        wait_minutes,
+        weather,
     )
 
 
@@ -90,19 +113,21 @@ def parse_arrival(value: str) -> timedelta:
     if len(value) != 5 or not value.isascii():
         raise ValueError("arrival times must use HH:MM")
     arrival = datetime.strptime(value, "%H:%M")
+    # PyMySQL reads SQL TIME as a timedelta, so both sources can be compared directly.
     return timedelta(hours=arrival.hour, minutes=arrival.minute)
 
 
 def import_trips(connection: pymysql.connections.Connection, trips: list[tuple]) -> int:
     """Insert observations that are not already stored and return the count."""
     select_trips = """
-        SELECT `date`, direction, stop_name, scheduled_arrival, actual_arrival,
+        SELECT date, direction, stop_name, scheduled_arrival, actual_arrival,
                time_of_day, destination_arrival, wait_time, weather
         FROM bus_trips
     """
+    # PyMySQL replaces each %s with the matching value from the trip tuple.
     insert_trip = """
         INSERT INTO bus_trips (
-            `date`, direction, stop_name, scheduled_arrival, actual_arrival,
+            date, direction, stop_name, scheduled_arrival, actual_arrival,
             time_of_day, destination_arrival, wait_time, weather
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -110,10 +135,12 @@ def import_trips(connection: pymysql.connections.Connection, trips: list[tuple])
     inserted = 0
     with connection.cursor() as cursor:
         cursor.execute(select_trips)
+        # Check all nine values to find an exact duplicate.
         stored_trips = list(cursor.fetchall())
         for trip in trips:
             if trip not in stored_trips:
                 cursor.execute(insert_trip, trip)
+                # Also skip repeated rows within this CSV import.
                 stored_trips.append(trip)
                 inserted += 1
     return inserted
@@ -122,12 +149,16 @@ def import_trips(connection: pymysql.connections.Connection, trips: list[tuple])
 def main() -> None:
     """Read the CSV, import new trips, and report how many were added."""
     try:
+        # Validate the whole file before opening the database connection.
         trips = read_trips(CSV_PATH)
+        if trips is None:
+            return
         with connect_to_database() as connection:
             added = import_trips(connection, trips)
+            # Save the insertions together once the import finishes.
             connection.commit()
-    except (ValueError, csv.Error):
-        print("Trip import failed: invalid CSV data.")
+    except ValueError as error:
+        print(f"Trip import failed: {error}")
         return
 
     print(f"Added {added} trip(s) from {CSV_PATH.name}.")

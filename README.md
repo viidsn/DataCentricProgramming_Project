@@ -60,7 +60,7 @@ The script connects to `127.0.0.1:3306` using the local XAMPP `root` account wit
 
 ## SQL queries
 
-After importing the trips, open the SQL tab in phpMyAdmin and run [data/queries.sql](data/queries.sql). It returns the average wait, the count and percentage of late buses, and the average wait and trip count for each recorded weather category.
+After importing the trips, open the SQL tab in phpMyAdmin and run [data/queries.sql](data/queries.sql). The queries report the overall average wait, the count and percentage of late buses, the average wait by weather, and the average ride duration by time of day.
 
 The late-arrival query compares times within the same calendar day. A trip whose scheduled and actual arrival fall on opposite sides of midnight needs a date-aware comparison.
 
@@ -68,7 +68,7 @@ The late-arrival query compares times within the same calendar day. A trip whose
 
 After importing the CSV, run `.venv/bin/python analysis.py`. The report uses pandas to calculate the average wait, the share of buses that arrived late, and the average wait and trip count for each weather category. As with the SQL queries, the delay calculation assumes both arrival times fall on the same calendar day.
 
-The report also compares average time on the bus for morning, afternoon, and evening trips. Ride duration is `destination_arrival` minus `actual_arrival` in minutes. A destination time earlier than boarding is treated as the next day. The comparison uses the scheduled `time_of_day` of each trip.
+The report also compares average time on the bus for morning, afternoon, and evening trips. Ride duration is `destination_arrival` minus `actual_arrival` in minutes, with both times on the same calendar day. The comparison uses the scheduled `time_of_day` of each trip.
 
 Run `.venv/bin/python charts.py` to open four charts showing average wait by weather, waiting time by trip, arrival punctuality, and average ride duration by time of day. The waiting-time scatter plot shows one point per trip and groups trips from the same date in a column. A dashed line shows the average across all trips. After adding observations, import the CSV again with `.venv/bin/python main.py` so the new trips appear in the charts.
 
@@ -112,7 +112,7 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 | `PROJECT_BRIEF.md` | Assignment requirements | Provided assignment brief |
 | `data/bus_trips.csv` | CSV headers and manually recorded bus observations | Own observations |
 | `data/schema.sql` | SQL script to create the database and trips table | Project database schema |
-| `data/queries.sql` | SQL summaries for the first three research questions | Project analysis queries |
+| `data/queries.sql` | SQL summaries for all four research questions | Project analysis queries |
 | `main.py` | Imports trip observations from CSV | Project application code |
 | `database.py` | Connects to XAMPP, loads trips and calculates shared summaries for the report and charts | Project database and analysis code |
 | `analysis.py` | Text summaries of waiting times, punctuality, waiting times by weather, and ride duration by time of day | Project analysis code |

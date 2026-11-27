@@ -20,6 +20,7 @@ def plot_wait_by_weather(summary: pd.DataFrame) -> Figure:
     labels = []
     colors = []
     weather_colors = {"dry": "#C88325", "rain": "#387EAD"}
+    # Put the sample size below each bar to give context for the average.
     for weather, count in summary["trips"].items():
         trip_word = "trip" if count == 1 else "trips"
         labels.append(f"{weather.capitalize()}\n({count} {trip_word})")
@@ -38,8 +39,10 @@ def plot_wait_by_weather(summary: pd.DataFrame) -> Figure:
 def plot_waiting_times(waits: pd.Series) -> Figure:
     """Plot each trip as a point and stack trips from the same date."""
     figure, ax = plt.subplots(figsize=(8, 4), layout="constrained")
+    # Use date labels so each travel day gets a column of points.
     dates = waits.index.strftime("%d/%m/%y")
     ax.scatter(dates, waits, s=55, color="#387EAD")
+    # The dashed line is the overall mean across trips.
     average_wait = waits.mean()
     ax.axhline(average_wait, color="#A34C36", linestyle="--",
                label=f"Average wait: {average_wait:.2f} min")
@@ -63,6 +66,7 @@ def plot_punctuality(late: int, on_time_or_early: int) -> Figure:
         ["Late", "On time or early"], counts,
         color=["#B95037", "#387EAD"], width=0.6,
     )
+    # The bar height is the trip count. The label also shows its share of all trips.
     labels = [f"{count} ({count / max(total, 1):.1%})" for count in counts]
     ax.bar_label(bars, labels=labels, padding=4)
     ax.set_title(f"Route 111 punctuality ({total} trips)")
@@ -79,6 +83,7 @@ def plot_ride_time_by_period(summary: pd.DataFrame) -> Figure:
         labels.append(f"{period.capitalize()}\n({count} {trip_word})")
 
     figure, ax = plt.subplots(figsize=(7, 4), layout="constrained")
+    # The three periods come from the summary in morning-to-evening order.
     averages = summary["average_ride_minutes"]
     bars = ax.bar(labels, averages, color="#387EAD", width=0.6)
     ax.bar_label(bars, fmt="%.2f", padding=4)
@@ -109,6 +114,7 @@ def main() -> None:
     rides = ride_time_by_period(trips)
     plot_ride_time_by_period(rides)
 
+    # Open the windows after all four figures have been created.
     plt.show()
 
 

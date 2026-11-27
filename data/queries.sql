@@ -8,7 +8,6 @@ FROM bus_trips
 WHERE wait_time IS NOT NULL;
 
 -- 2. How often does the bus arrive later than scheduled?
--- Both arrival times must be known and refer to the same calendar day.
 SELECT
     COUNT(*) AS trips_with_arrival_times,
     COUNT(CASE WHEN actual_arrival > scheduled_arrival THEN 1 END) AS late_trips,
@@ -31,3 +30,13 @@ WHERE weather IN ('rain', 'dry')
   AND wait_time IS NOT NULL
 GROUP BY weather
 ORDER BY average_wait_minutes DESC, weather;
+
+-- 4. How much does my average time on the bus vary between morning, afternoon, and evening trips?
+SELECT
+    time_of_day,
+    COUNT(*) AS trips,
+    ROUND(AVG(TIME_TO_SEC(destination_arrival) - TIME_TO_SEC(actual_arrival)) / 60, 2)
+        AS average_ride_minutes
+FROM bus_trips
+GROUP BY time_of_day
+ORDER BY time_of_day;
