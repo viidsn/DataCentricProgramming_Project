@@ -27,7 +27,29 @@ def load_trips(connection: pymysql.connections.Connection) -> pd.DataFrame:
         """)
         rows = cursor.fetchall()
         # Use the column names from the query to label the DataFrame.
-        columns = [column[0] for column in cursor.description]
+        columns = []
+        for column in cursor.description:
+            columns.append(column[0])
+    return pd.DataFrame(rows, columns=columns)
+
+
+def load_trip_table(connection: pymysql.connections.Connection) -> pd.DataFrame:
+    """Load all trip fields and format clock times for the terminal table."""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT date, direction, stop_name AS stop,
+                   TIME_FORMAT(scheduled_arrival, '%H:%i') AS scheduled,
+                   TIME_FORMAT(actual_arrival, '%H:%i') AS boarded,
+                   time_of_day AS period,
+                   TIME_FORMAT(destination_arrival, '%H:%i') AS destination,
+                   wait_time AS wait_min, weather
+            FROM bus_trips
+            ORDER BY date, actual_arrival, id
+        """)
+        rows = cursor.fetchall()
+        columns = []
+        for column in cursor.description:
+            columns.append(column[0])
     return pd.DataFrame(rows, columns=columns)
 
 

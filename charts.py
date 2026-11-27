@@ -22,7 +22,10 @@ def plot_wait_by_weather(summary: pd.DataFrame) -> Figure:
     weather_colors = {"dry": "#C88325", "rain": "#387EAD"}
     # Put the sample size below each bar to give context for the average.
     for weather, count in summary["trips"].items():
-        trip_word = "trip" if count == 1 else "trips"
+        if count == 1:
+            trip_word = "trip"
+        else:
+            trip_word = "trips"
         labels.append(f"{weather.capitalize()}\n({count} {trip_word})")
         colors.append(weather_colors[weather])
 
@@ -67,7 +70,10 @@ def plot_punctuality(late: int, on_time_or_early: int) -> Figure:
         color=["#B95037", "#387EAD"], width=0.6,
     )
     # The bar height is the trip count. The label also shows its share of all trips.
-    labels = [f"{count} ({count / max(total, 1):.1%})" for count in counts]
+    labels = []
+    for count in counts:
+        share = count / max(total, 1)
+        labels.append(f"{count} ({share:.1%})")
     ax.bar_label(bars, labels=labels, padding=4)
     ax.set_title(f"Route 111 punctuality ({total} trips)")
     ax.set_ylabel("Number of trips")
@@ -79,7 +85,10 @@ def plot_ride_time_by_period(summary: pd.DataFrame) -> Figure:
     """Plot average time onboard for morning, afternoon and evening trips."""
     labels = []
     for period, count in summary["trips"].items():
-        trip_word = "trip" if count == 1 else "trips"
+        if count == 1:
+            trip_word = "trip"
+        else:
+            trip_word = "trips"
         labels.append(f"{period.capitalize()}\n({count} {trip_word})")
 
     figure, ax = plt.subplots(figsize=(7, 4), layout="constrained")

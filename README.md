@@ -52,7 +52,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Import [data/schema.sql](data/schema.sql) in phpMyAdmin to create the `bus_tracker` database and its `bus_trips` table. Then run `.venv/bin/python main.py` to import the observations from `data/bus_trips.csv`.
+Import [data/schema.sql](data/schema.sql) in phpMyAdmin to create the `bus_tracker` database and its `bus_trips` table. Run `.venv/bin/python main.py` to open the menu. Choose **1** to import observations from `data/bus_trips.csv`, **2** to show all stored trips, or **3** to filter trips by date (`YYYY-MM-DD`).
 
 The script checks the entire CSV before inserting any trips. If a row is invalid, the import stops. It skips any row whose nine values match a stored trip, then reports how many trips it added. If you correct a row already in the database, the script inserts the corrected row as a new trip.
 
@@ -104,6 +104,10 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 
 *My manual trip notes. Each line shows when I reached the stop, when the bus arrived, and when I reached my destination.*
 
+![Leap Card transaction history showing Bus Éireann journeys on 26 and 27 November 2026](docs/images/data%20proof.jpg)
+
+*The four Bus Éireann transaction times match the boarding times I recorded for 26 and 27 November. This screenshot is a cross-check for my manual observations.*
+
 # List of files in the project
 
 | File | Purpose | Source |
@@ -118,7 +122,7 @@ I photographed the posted timetables at both boarding stops. I use these signs t
 | `analysis.py` | Text summaries of waiting times, punctuality, waiting times by weather, and ride duration by time of day | Project analysis code |
 | `charts.py` | Matplotlib charts of waiting times, waiting times by weather, punctuality, and ride duration by time of day | Project chart code |
 | `data/route_111_timetable.txt` | Timetable reference for both boarding stops | Transcribed from the posted timetables |
-| `docs/images/` | Photos of the posted timetables and a screenshot of my trip notes | Own photos and notes |
+| `docs/images/` | Timetable photos, trip notes, and a Leap Card transaction screenshot | Own photos, notes, and screenshot |
 
 # References
 

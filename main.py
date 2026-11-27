@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pymysql
 
-from database import connect_to_database
+from database import connect_to_database, load_trip_table
 
 
 CSV_PATH = Path(__file__).resolve().parent / "data" / "bus_trips.csv"
@@ -50,9 +50,13 @@ def parse_trip(row: dict[str, str | None]) -> tuple:
     # DictReader puts extra values under an extra key and fills missing values with None.
     if len(row) != len(COLUMNS):
         raise ValueError("The trip has extra fields")
+    # Check all values for anomalies
     fields = {}
     for column in COLUMNS:
-        value = (row[column] or "").strip()
+        value = row[column]
+        if value is None:
+            raise ValueError("All trip fields are required")
+        value = value.strip()
         if value == "":
             raise ValueError("All trip fields are required")
         fields[column] = value
@@ -67,9 +71,11 @@ def parse_trip(row: dict[str, str | None]) -> tuple:
     wait = fields["wait_time"]
     weather = fields["weather"]
 
+    # Check the date according to the rules in README
     parsed_date = date.fromisoformat(trip_date)
     if parsed_date.isoformat() != trip_date:
         raise ValueError("date must use YYYY-MM-DD")
+    # Check the direction and stop according to the rules in README
     if BOARDING_STOPS.get(direction) != stop:
         raise ValueError("direction and boarding stop must match")
 
@@ -77,6 +83,7 @@ def parse_trip(row: dict[str, str | None]) -> tuple:
     actual_time = parse_arrival(actual)
     destination_time = parse_arrival(destination)
 
+    # Check the period according to the rules in README
     # Use the scheduled hour so a delay cannot move a trip to a different period.
     hour = int(scheduled[:2])
     if hour < 12:
@@ -88,9 +95,12 @@ def parse_trip(row: dict[str, str | None]) -> tuple:
     if period != expected_period:
         raise ValueError("time_of_day must match the scheduled arrival")
 
+    # Check the wait_time to see if the number is real
     wait_minutes = int(wait)
     if not 0 <= wait_minutes <= 4_294_967_295:
         raise ValueError("wait_time must fit in an unsigned INT")
+
+    # Check the weather according to the rules in README
     if weather not in ("rain", "dry"):
         raise ValueError("weather must be rain or dry")
 
@@ -117,7 +127,7 @@ def parse_arrival(value: str) -> timedelta:
     return timedelta(hours=arrival.hour, minutes=arrival.minute)
 
 
-def import_trips(connection: pymysql.connections.Connection, trips: list[tuple]) -> int:
+def import_trips(connection: pymysql.connections.Connection, trips: list[tuple]) -> None:
     """Insert observations that are not already stored and return the count."""
     select_trips = """
         SELECT date, direction, stop_name, scheduled_arrival, actual_arrival,
@@ -143,25 +153,65 @@ def import_trips(connection: pymysql.connections.Connection, trips: list[tuple])
                 # Also skip repeated rows within this CSV import.
                 stored_trips.append(trip)
                 inserted += 1
-    return inserted
+
+        print(f"Added {inserted} trip(s) from {CSV_PATH.name}.")
+    return
 
 
 def main() -> None:
-    """Read the CSV, import new trips, and report how many were added."""
-    try:
-        # Validate the whole file before opening the database connection.
-        trips = read_trips(CSV_PATH)
-        if trips is None:
-            return
-        with connect_to_database() as connection:
-            added = import_trips(connection, trips)
-            # Save the insertions together once the import finishes.
-            connection.commit()
-    except ValueError as error:
-        print(f"Trip import failed: {error}")
-        return
+    """Run the bus tracker menu."""
+    while True:
+        print("\n=== Bus Punctuality Tracker ===")
+        print("1. Import trips from CSV")
+        print("2. Show all trips")
+        print("3. Filter trips by date")
+        print("4. Filter trips by weather")
+        print("5. Show summary")
+        print("6. Show charts")
+        print("0. Exit")
 
-    print(f"Added {added} trip(s) from {CSV_PATH.name}.")
+        choice = input("\nChoose an option: ").strip()
+
+        if choice == "1":
+            try:
+                # Validate the whole file before opening the database connection.
+                trips = read_trips(CSV_PATH)
+                if trips is None:
+                    continue
+                with connect_to_database() as connection:
+                    import_trips(connection, trips)
+                    # Save the insertions together once the import finishes.
+                    connection.commit()
+            except ValueError as error:
+                print(f"Trip import failed: {error}")
+                continue
+            except pymysql.MySQLError as error:
+                print(f"Database error: {error}")
+        elif choice == "2":
+            try:
+                with connect_to_database() as connection:
+                    table = load_trip_table(connection)
+                print(table.to_string(index=False))
+            except pymysql.MySQLError as error:
+                print(f"Could not load trips: {error}")
+        elif choice == "3":
+            try:
+                selected_date = date.fromisoformat(input("Enter date (YYYY-MM-DD): ").strip())
+                with connect_to_database() as connection:
+                    table = load_trip_table(connection)
+                # Creating pandas Series to compare the DataFrame with the filter
+                matches = table["date"] == selected_date
+                matching_trips = table[matches]
+                if matching_trips.empty:
+                    print(f"No trips found for {selected_date}.")
+                else:
+                    print(matching_trips.to_string(index=False))
+            except ValueError:
+                print("Enter a valid date in YYYY-MM-DD format.")
+            except pymysql.MySQLError as error:
+                print(f"Could not load trips: {error}")
+        elif choice == "0":
+            break
 
 
 main()
